@@ -1,5 +1,12 @@
+class Number:
+    def __init__(self, value):
+        self.value = value
+    
+    def evaluate(self):
+        return self.value
+
 class Arithmetic:
-    def __init__(args):
+    def __init__(self, args):
         self.args = args
 
 class Add(Arithmetic):

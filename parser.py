@@ -2,7 +2,6 @@ from constants import *
 
 def parse(s):
     tokens = tokenify(s)
-    print(tokens)
     expression, _ = parse_iter(tokens)
     return expression
 

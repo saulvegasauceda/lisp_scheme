@@ -1,4 +1,4 @@
-import * from Expression
+from expression import *
 
 special = {
     "+": Add, 

@@ -1,6 +1,6 @@
 class Environment:
-    def __init__(self, parent=None):
-        self.env = {}
+    def __init__(self, env={}, parent=None):
+        self.env = env
         self.parent = parent
     
     def get(self, name):
@@ -27,12 +27,12 @@ class Number:
         return self.value
 
 class Arithmetic:
-    def __init__(self, args):
+    def __init__(self, name, args):
         self.args = args
-        self.symbol = None
-
+        self.name = name
+    
     def __str__(self):
-        result = f"({self.symbol}"
+        result = f"({self.name}"
         
         for arg in self.args:
             result += f" {str(arg.__str__())}"
@@ -40,46 +40,40 @@ class Arithmetic:
         return result
 
 class Add(Arithmetic):
-    def __init__(self, args):
-        self.args = args
-        self.symbol = "+" 
     def evaluate(self, local_frame):
-        return sum(sub_expr.evaluate() for sub_expr in self.args)
+        return sum(sub_expr.evaluate(local_frame) for sub_expr in self.args)
 
 class Minus(Arithmetic):
-    def __init__(self, args):
-        self.args = args
-        self.symbol = "-"
-
     def evaluate(self, local_frame):
-        result = self.args[0].evaluate()
+        result = self.args[0].evaluate(local_frame)
         if len(self.args) == 1:
             return -result
 
         for sub_expr in self.args[1:]:
-            result -= sub_expr.evaluate()
+            result -= sub_expr.evaluate(local_frame)
         return result
 
 class Divide(Arithmetic):
-    def __init__(self, args):
-        self.args = args
-        self.symbol = "/"
-
     def evaluate(self, local_frame):
-        result = self.args[0].evaluate()
+        result = self.args[0].evaluate(local_frame)
         for sub_expr in self.args[1:]:
-            result = result / sub_expr.evaluate() # check if short hand is possible
+            result = result / sub_expr.evaluate(local_frame) # check if short hand is possible
         return result
 
 class Multiply(Arithmetic):
-    def __init__(self, args):
-        self.args = args
-        self.symbol = "*"
-    
     def evaluate(self, local_frame):
         result = 1
         for sub_expr in self.args:
-            result = result * sub_expr.evaluate()
+            result = result * sub_expr.evaluate(local_frame) 
+        return result
+
+class And(Arithmetic):
+    def evaluate(self, local_frame):
+        return all(expr.evaluate(local_frame) for expr in self.args)
+
+class Or(Arithmetic):
+    def evaluate(self, local_frame):
+        return any(expr.evaluate(local_frame) for expr in self.args)
 
 class If:
     def __init__(self, predicate, consequent, alternative):
@@ -88,9 +82,9 @@ class If:
         self.alternative = alternative
 
     def evaluate(self, local_frame):
-        if self.predicate.evaluate():
-            return self.consequent.evaluate()
-        return self.alternative.evaluate()
+        if self.predicate.evaluate(local_frame):
+            return self.consequent.evaluate(local_frame)
+        return self.alternative.evaluate(local_frame)
 
 class Else:
     def evaluate(self, local_frame):
@@ -102,65 +96,54 @@ class Cond:
 
     def evaluate(self, local_frame):
         for predicate, expression in clauses:
-            if predicate.expression.evaluate():
-                return expression.evaluate()        
-
-class And:
-    def __init__(self, expressions):
-        self.expressions = expressions
-
-    def evaluate(self, local_frame):
-        return all(expr.evaluate() for expr in self.expressions)
-
-class Or:
-    def __init__(self, expressions):
-        self.expressions = expressions
-
-    def evaluate(self, local_frame):
-        return any(expr.evaluate() for expr in self.expressions)
+            if predicate.expression.evaluate(local_frame):
+                return expression.evaluate(local_frame)        
 
 class Define_Var:
     def __init__(self, name, value, local_frame):
         self.name = name
         self.value = value
 
-        local_frame.add(name) = self.value.evaluate()
+    def evaluate(self, local_frame):
+        local_frame.add(self.name, self.value.evaluate(local_frame))
 
 class Define_Lambda:
     def __init__(self, name, params, body, local_frame):
         self.name = name
         self.params = params
         self.body = body
-
-        local_frame.add(name) = self
-
-class Lambda:
-    def __init__(self, name, args):
-        self.name = name
-        self.args = args
+    
+    def create_lambda(self, name, args):
+        return Lambda(name, args, self.params, self.body)
 
     def evaluate(self, local_frame):
-        procedure = local_frame.get(self.name)
-        
+        local_frame.add(self.name, self.create_lambda)
+
+class Lambda:
+    def __init__(self, name, args, params, body):
+        self.name = name
+        self.args = args
+        self.params = params
+        self.body = body
+
+    def evaluate(self, local_frame):
         n = len(self.args)
-        m = len(procedure.params)
+        m = len(self.params)
         if n != m: 
             raise Exception(f"mismatched number of arguments for {self.name} call")
         
-        function_frame = Environment(local_frame)
+        function_frame = Environment({}, local_frame)
         for i in range(n):
-            Define_Var(params[i], self.args[i], function_frame)
-
-        return procedure.body.evaluate(local_frame)
+            Define_Var(self.params[i], self.args[i], function_frame).evaluate(function_frame)
+        return self.body.evaluate(function_frame)
         
     
 class Variable:
     def __init__(self, name, local_frame):
         self.name = name
-        self.value = local_frame.get(name)
 
     def evaluate(self, local_frame):
-        return self.value
+        return local_frame.get(self.name)
     
     def __str__(self):
         return self.name
